@@ -55,7 +55,7 @@
 </html> -->
 
 
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
@@ -151,5 +151,161 @@
     document.addEventListener('DOMContentLoaded', loadTasks);
 </script>
 
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List com Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Formulário de Login -->
+<div id="loginForm">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Usuário">
+    <input type="password" id="password" placeholder="Senha">
+    <button onclick="login()">Entrar</button>
+</div>
+
+<!-- Aplicação de To-Do List (Escondida até login) -->
+<div id="todoApp" style="display:none;">
+    <div class="container">
+        <h1>To-Do List</h1>
+        <input type="text" id="taskTitle" placeholder="Adicionar uma tarefa">
+        <button onclick="addTask()">Adicionar Tarefa</button>
+        <ul id="taskList" class="task-list"></ul>
+    </div>
+</div>
+
+<script>
+    let token = ''; // Token JWT será armazenado aqui
+
+    // Função de login
+    async function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        if (!username || !password) {
+            alert('Usuário ou senha não podem estar vazios!');
+            return;
+        }
+
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                token = data.token;  // Armazenar o token JWT
+
+                // Esconder o formulário de login e mostrar o app de tarefas
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('todoApp').style.display = 'block';
+
+                // Carregar as tarefas
+                loadTasks();
+            } else {
+                alert('Usuário ou senha incorretos');
+            }
+        } catch (error) {
+            console.error('Erro na requisição de login:', error);
+        }
+    }
+
+    // Adicionar uma nova tarefa
+    async function addTask() {
+        const taskTitle = document.getElementById('taskTitle').value;
+        if (!taskTitle) return;
+
+        const response = await fetch('/tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Usar o token JWT para autenticação
+            },
+            body: JSON.stringify({ title: taskTitle }),
+        });
+
+        if (response.ok) {
+            const newTask = await response.json();
+            addTaskToDOM(newTask);
+            document.getElementById('taskTitle').value = '';  // Limpar o campo após adicionar a tarefa
+        }
+    }
+
+    // Adicionar a tarefa ao DOM (visualmente)
+    function addTaskToDOM(task) {
+        const taskList = document.getElementById('taskList');
+        const taskItem = document.createElement('li');
+        taskItem.className = 'task';
+        taskItem.innerHTML = `
+            ${task.title} - <span class="status">${task.status}</span>
+            <button onclick="toggleTask(this, ${task.id})">Alternar</button>
+            <button onclick="deleteTask(this, ${task.id})">Deletar</button>
+        `;
+        taskList.appendChild(taskItem);
+    }
+
+    // Alternar o status da tarefa
+    async function toggleTask(button, taskId) {
+        const taskItem = button.parentNode;
+        const currentStatus = taskItem.querySelector('.status').textContent;
+        const newStatus = currentStatus === 'pending' ? 'complete' : 'pending';
+
+        const response = await fetch(`/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Usar o token JWT para autenticação
+            },
+            body: JSON.stringify({ status: newStatus }),
+        });
+
+        if (response.ok) {
+            const updatedTask = await response.json();
+            taskItem.querySelector('.status').textContent = updatedTask.status;
+        }
+    }
+
+    // Remover a tarefa
+    async function deleteTask(button, taskId) {
+        const response = await fetch(`/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}` // Usar o token JWT para autenticação
+            },
+        });
+
+        if (response.ok) {
+            const taskItem = button.parentNode;
+            taskItem.remove();
+        }
+    }
+
+    // Carregar todas as tarefas quando a página for carregada
+    async function loadTasks() {
+        const response = await fetch('/tasks', {
+            headers: {
+                'Authorization': `Bearer ${token}` // Usar o token JWT para autenticação
+            },
+        });
+
+        if (response.ok) {
+            const tasks = await response.json();
+            tasks.forEach(task => addTaskToDOM(task));
+        }
+    }
+</script>
 </body>
 </html>
